@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Number Duel — Multiplayer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+  :root {
+    --blue: #3B6EF8;
+    --blue-dark: #2857d6;
+    --blue-light: #EEF3FF;
+    --green: #22c55e;
+    --green-bg: #f0fdf4;
+    --red: #ef4444;
+    --red-bg: #fef2f2;
+    --amber: #f59e0b;
+    --purple: #8b5cf6;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f0f4ff;
+    color: var(--gray-900);
+    min-height: 100vh;
+  }
+
+  /* ---- TOPBAR ---- */
+  .topbar {
+    background: var(--blue);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(59,110,248,0.3);
+  }
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .brand-name { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: #fff; }
+  .brand-sub { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 400; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .top-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 13px; color: #fff; font-weight: 500;
+  }
+  .top-badge svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; }
+  .btn-leave {
+    display: flex; align-items: center; gap: 6px;
+    background: #fff;
+    color: var(--red);
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: opacity 0.15s;
+  }
+  .btn-leave:hover { opacity: 0.85; }
+
+  /* ---- INFO BAR ---- */
+  .infobar {
+    background: #fff;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 24px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 13px;
+  }
+  .info-item { display: flex; align-items: center; gap: 8px; }
+  .info-label { color: var(--gray-500); }
+  .info-val { font-weight: 600; color: var(--blue); font-family: 'Space Grotesk', sans-serif; }
+  .copy-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 4px;
+    color: var(--gray-400); transition: color 0.15s;
+  }
+  .copy-btn:hover { color: var(--blue); }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+    50% { box-shadow: 0 0 0 5px rgba(34,197,94,0.1); }
+  }
+  .status-dot.orange { background: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  .status-text { font-weight: 500; }
+  .status-text.green { color: var(--green); }
+  .status-text.orange { color: var(--amber); }
+  .range-badge {
+    background: var(--gray-100);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px; font-weight: 600;
+    color: var(--gray-700);
+  }
+
+  /* ---- MAIN LAYOUT ---- */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    padding: 16px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ---- CARDS ---- */
+  .card {
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow);
+  }
+  .card-body { padding: 20px; }
+
+  /* ---- PLAYER PANEL ---- */
+  .player-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .player-info { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 14px;
+  }
+  .avatar.p1 { background: var(--blue-light); color: var(--blue); }
+  .avatar.p2 { background: #ede9fe; color: var(--purple); }
+  .player-name { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--blue); }
+  .your-turn-badge {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--blue-light);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px; font-weight: 600; color: var(--blue);
+  }
+
+  .guess-area {
+    background: var(--blue-light);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .guess-area-title { font-size: 13px; font-weight: 600; color: var(--blue); margin-bottom: 10px; }
+  .guess-row { display: flex; gap: 10px; }
+  .guess-input {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 15px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--gray-900);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .guess-input:focus { border-color: var(--blue); }
+  .guess-input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-guess {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 22px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-guess:hover:not(:disabled) { background: var(--blue-dark); }
+  .btn-guess:active:not(:disabled) { transform: scale(0.97); }
+  .btn-guess:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---- HISTORY ---- */
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .history-list { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .history-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-100);
+    background: var(--gray-50);
+    font-size: 14px;
+  }
+  .hint-badge {
+    display: flex; align-items: center; gap: 5px;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px; font-weight: 600;
+  }
+  .hint-higher { background: #eff6ff; color: #1d4ed8; }
+  .hint-lower { background: var(--red-bg); color: var(--red); }
+  .hint-correct { background: var(--green-bg); color: #16a34a; }
+  .hint-who { font-size: 11px; color: var(--gray-400); }
+
+  /* ---- WIN BANNER ---- */
+  .win-banner {
+    margin-top: 16px;
+    background: var(--green-bg);
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .win-icon { font-size: 24px; }
+  .win-title { font-weight: 700; font-size: 15px; color: #15803d; }
+  .win-sub { font-size: 13px; color: #16a34a; }
+
+  /* ---- WAITING OVERLAY ---- */
+  .waiting-msg {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #92400e;
+    margin-bottom: 12px;
+  }
+
+  /* ---- SIDEBAR ---- */
+  .sidebar { display: flex; flex-direction: column; gap: 14px; }
+
+  /* Players card */
+  .players-card .card-body { padding: 16px 20px; }
+  .players-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .player-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .player-row:last-child { border-bottom: none; }
+  .player-row-left { display: flex; align-items: center; gap: 10px; }
+  .avatar-sm {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 12px;
+    position: relative;
+  }
+  .avatar-sm::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 1.5px solid #fff;
+  }
+  .avatar-sm.p1 { background: var(--blue-light); color: var(--blue); }
+  .avatar-sm.p2 { background: #ede9fe; color: var(--purple); }
+  .prow-name { font-size: 13px; font-weight: 600; }
+  .prow-you { font-size: 11px; color: var(--gray-400); }
+  .status-pill {
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-guessing { background: var(--blue-light); color: var(--blue); }
+  .pill-waiting { background: var(--gray-100); color: var(--gray-500); }
+
+  /* Chat */
+  .chat-card { display: flex; flex-direction: column; }
+  .chat-header { padding: 14px 16px 0; font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
+  .chat-messages {
+    flex: 1;
+    padding: 12px 16px;
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .chat-msg { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-msg.mine { flex-direction: row-reverse; }
+  .chat-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 10px;
+    flex-shrink: 0;
+  }
+  .chat-avatar.p1 { background: var(--blue-light); color: var(--blue); }
+  .chat-avatar.p2 { background: #ede9fe; color: var(--purple); }
+  .chat-bubble {
+    max-width: 75%;
+    padding: 7px 11px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .chat-bubble.theirs {
+    background: var(--gray-100);
+    color: var(--gray-900);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-bubble.mine-bubble {
+    background: var(--blue);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-time { font-size: 10px; color: var(--gray-400); }
+  .chat-name { font-size: 10px; color: var(--gray-500); margin-bottom: 2px; }
+  .chat-input-row {
+    display: flex; gap: 8px;
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--gray-100);
+  }
+  .chat-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .chat-input:focus { border-color: var(--blue); }
+  .btn-send {
+    background: var(--blue);
+    border: none;
+    border-radius: 8px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-send:hover { background: var(--blue-dark); }
+  .btn-send svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+
+  /* ---- FOOTER ---- */
+  .footer-bar {
+    background: #fff;
+    border-top: 1px solid var(--gray-200);
+    padding: 12px 24px;
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .foot-item { display: flex; align-items: center; gap: 8px; }
+  .foot-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .foot-icon.blue { background: var(--blue-light); }
+  .foot-icon.red { background: var(--red-bg); }
+  .foot-icon.amber { background: #fffbeb; }
+  .foot-icon.gray { background: var(--gray-100); }
+  .foot-label { font-size: 12px; font-weight: 700; color: var(--gray-700); }
+  .foot-sub { font-size: 11px; color: var(--gray-400); }
+
+  /* ---- LOBBY SCREEN ---- */
+  #lobby-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .lobby-card {
+    background: #fff;
+    border-radius: 20px;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-md);
+    padding: 36px 40px;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+  }
+  .lobby-icon { font-size: 48px; margin-bottom: 12px; }
+  .lobby-title { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
+  .lobby-sub { font-size: 14px; color: var(--gray-500); margin-bottom: 28px; }
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 20px 0;
+    font-size: 12px; color: var(--gray-400);
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1;
+    height: 1px; background: var(--gray-200);
+  }
+  .lobby-input {
+    width: 100%; padding: 11px 14px;
+    font-size: 14px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    outline: none; margin-bottom: 10px;
+    transition: border-color 0.15s;
+    color: var(--gray-900);
+  }
+  .lobby-input:focus { border-color: var(--blue); }
+  .btn-primary {
+    width: 100%; padding: 12px;
+    background: var(--blue);
+    color: #fff; border: none;
+    border-radius: var(--radius-sm);
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s;
+    margin-bottom: 8px;
+  }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-secondary {
+    width: 100%; padding: 12px;
+    background: #fff;
+    color: var(--gray-700); border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--gray-50); }
+  .lobby-err { font-size: 13px; color: var(--red); margin-top: 6px; min-height: 18px; }
+  .lobby-step2 { display: none; }
+  .room-code-display {
+    background: var(--blue-light);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .room-code-label { font-size: 12px; color: var(--gray-500); margin-bottom: 4px; }
+  .room-code-val { font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 4px; color: var(--blue); }
+  .waiting-dots::after {
+    content: '';
+    animation: dots 1.2s steps(3, end) infinite;
+  }
+  @keyframes dots {
+    0%   { content: ''; }
+    33%  { content: '.'; }
+    66%  { content: '..'; }
+    100% { content: '...'; }
+  }
+
+  /* ---- SECRET SCREEN ---- */
+  #secret-screen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .secret-card {
+    background: #fff;
+    border-radius: 20px;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-md);
+    padding: 36px 40px;
+    width: 100%; max-width: 420px;
+    text-align: center;
+  }
+  .secret-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .secret-sub { font-size: 14px; color: var(--gray-500); margin-bottom: 24px; }
+
+  /* ---- HIDDEN ---- */
+  .hidden { display: none !important; }
+
+  /* ---- SCORE STAT ---- */
+  .score-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .score-box {
+    flex: 1; background: var(--gray-50); border-radius: var(--radius-sm);
+    padding: 10px 14px; border: 1px solid var(--gray-100); text-align: center;
+  }
+  .score-num { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+  .score-lbl { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+  .help-link { font-size: 12px; color: var(--blue); text-decoration: none; font-weight: 600; }
+  .help-link:hover { text-decoration: underline; }
+
+  /* ---- TOAST ---- */
+  .toast {
+    position: fixed;
+    top: 70px; right: 20px;
+    background: var(--gray-900);
+    color: #fff;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px; font-weight: 500;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== LOBBY SCREEN ===== -->
+<div id="lobby-screen">
+  <div class="lobby-card">
+    <div class="lobby-icon">🎲</div>
+    <div class="lobby-title">Number Duel</div>
+    <div class="lobby-sub">Multiplayer Number Guessing Game</div>
+
+    <div id="lobby-step1">
+      <input class="lobby-input" id="player-name-input" placeholder="Your name..." maxlength="18" />
+      <button class="btn-primary" onclick="goStep2()">Continue</button>
+      <div class="lobby-err" id="name-err"></div>
+    </div>
+
+    <div class="lobby-step2" id="lobby-step2">
+      <input class="lobby-input" id="player-name-input2" placeholder="Your name..." maxlength="18" readonly style="background:var(--gray-50);color:var(--gray-500);" />
+      <button class="btn-primary" onclick="createRoom()">🏠 Create Room</button>
+      <div class="divider">or join existing</div>
+      <input class="lobby-input" id="join-code-input" placeholder="Enter Room ID..." maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:'Space Grotesk',sans-serif;font-size:18px;" />
+      <button class="btn-secondary" onclick="joinRoom()">🔗 Join Room</button>
+      <div class="lobby-err" id="join-err"></div>
+    </div>
+
+    <!-- Waiting for opponent -->
+    <div id="lobby-waiting" class="hidden">
+      <div class="room-code-display">
+        <div class="room-code-label">Share this Room ID with your friend</div>
+        <div class="room-code-val" id="display-room-id">------</div>
+      </div>
+      <p style="font-size:14px;color:var(--gray-500);">Waiting for opponent<span class="waiting-dots"></span></p>
+      <div style="margin-top:16px;">
+        <button class="btn-secondary" onclick="copyRoomId()" style="width:auto;padding:8px 18px;font-size:13px;">📋 Copy Room ID</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECRET SCREEN ===== -->
+<div id="secret-screen" class="hidden">
+  <div class="secret-card">
+    <div style="font-size:40px;margin-bottom:12px;">🔐</div>
+    <div class="secret-title" id="secret-player-label">Pick your secret number</div>
+    <div class="secret-sub" id="secret-range-label">Choose between 1 and 100</div>
+    <input class="lobby-input" type="number" id="secret-input" placeholder="Your secret number..." style="font-size:18px;text-align:center;" />
+    <div class="lobby-err" id="secret-err"></div>
+    <button class="btn-primary" onclick="lockSecret()">🔒 Lock it in!</button>
+    <div id="secret-waiting-msg" class="hidden" style="margin-top:14px;font-size:14px;color:var(--gray-500);">
+      Waiting for opponent to pick<span class="waiting-dots"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GAME SCREEN ===== -->
+<div id="game-screen" class="hidden">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon">🎲</div>
+      <div>
+        <div class="brand-name">Number Duel</div>
+        <div class="brand-sub">Multiplayer Number Guessing Game</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="top-badge">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        2 Players
+      </div>
+      <button class="btn-leave" onclick="leaveGame()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Leave Room
+      </button>
+    </div>
+  </div>
+
+  <!-- Infobar -->
+  <div class="infobar">
+    <div class="info-item">
+      <span class="info-label">Room ID:</span>
+      <span class="info-val" id="game-room-id">------</span>
+      <button class="copy-btn" onclick="copyRoomId()" title="Copy">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      </button>
+    </div>
+    <div class="info-item">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-text green" id="status-text">Game in Progress</span>
+    </div>
+    <div class="range-badge" id="game-range-badge">Range: 1 – 100</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-layout">
+    <!-- Left: game panel -->
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-body">
+          <div class="player-header">
+            <div class="player-info">
+              <div class="avatar p1" id="game-my-avatar">P1</div>
+              <div>
+                <div class="player-name" id="game-my-name">Player 1 (You)</div>
+              </div>
+            </div>
+            <div class="your-turn-badge" id="your-turn-badge">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              Your Turn
+            </div>
+          </div>
+
+          <div id="waiting-msg-box" class="waiting-msg hidden">
+            Waiting for <span id="wait-for-name">opponent</span> to guess...
+          </div>
+
+          <div class="guess-area" id="guess-area">
+            <div class="guess-area-title" id="guessing-label">Guessing <span id="opp-name-label">Player 2</span>'s Number</div>
+            <div class="guess-row">
+              <input class="guess-input" type="number" id="guess-input" placeholder="Enter your guess..." />
+              <button class="btn-guess" id="guess-btn" onclick="submitGuess()">Guess</button>
+            </div>
+            <div id="guess-err" style="font-size:12px;color:var(--red);margin-top:6px;min-height:16px;"></div>
+          </div>
+
+          <div class="score-row">
+            <div class="score-box">
+              <div class="score-num" id="my-guesses-count">0</div>
+              <div class="score-lbl" id="my-guesses-label">My guesses</div>
+            </div>
+            <div class="score-box">
+              <div class="score-num" id="opp-guesses-count">0</div>
+              <div class="score-lbl" id="opp-guesses-label">Their guesses</div>
+            </div>
+          </div>
+
+          <div id="win-banner" class="win-banner hidden">
+            <div class="win-icon">🏆</div>
+            <div>
+              <div class="win-title" id="win-title">You won!</div>
+              <div class="win-sub" id="win-sub">You guessed the number!</div>
+            </div>
+          </div>
+
+          <div id="lose-banner" class="win-banner hidden" style="background:#fef2f2;border-color:#fecaca;">
+            <div class="win-icon">😔</div>
+            <div>
+              <div class="win-title" style="color:#dc2626;" id="lose-title">You lost!</div>
+              <div class="win-sub" style="color:#ef4444;" id="lose-sub">Better luck next time!</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:14px;" id="rematch-row" class="hidden">
+            <button class="btn-primary" style="width:auto;flex:1;" onclick="playAgain()">🔄 Play Again</button>
+            <button class="btn-secondary" style="width:auto;flex:1;" onclick="leaveGame()">Leave</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card">
+        <div class="card-body">
+          <div class="section-title">Guess History</div>
+          <ul class="history-list" id="history-list">
+            <li style="font-size:13px;color:var(--gray-400);text-align:center;padding:12px 0;">No guesses yet</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Players -->
+      <div class="card players-card">
+        <div class="card-body" style="padding:16px 20px;">
+          <div class="players-title">Players</div>
+          <div class="player-row">
+            <div class="player-row-left">
+              <div class="avatar-sm p1" id="sidebar-my-avatar">P1</div>
+              <div>
+                <div class="prow-name" id="sidebar-my-name">Player 1</div>
+                <div class="prow-you">(You)</div>
+              </div>
+            </div>
+            <div class="status-pill pill-guessing" id="my-status-pill">Guessing</div>
+          </div>
+          <div class="player-row">
+            <div class="player-row-left">
+              <div class="avatar-sm p2" id="sidebar-opp-avatar">P2</div>
+              <div>
+                <div class="prow-name" id="sidebar-opp-name">Player 2</div>
+                <div class="prow-you">Opponent</div>
+              </div>
+            </div>
+            <div class="status-pill pill-waiting" id="opp-status-pill">Waiting</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="card chat-card">
+        <div class="chat-header">Chat</div>
+        <div class="chat-messages" id="chat-messages">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">Say hi to your opponent!</div>
+        </div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Type a message..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()" />
+          <button class="btn-send" onclick="sendChat()">
+            <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <div class="foot-item">
+      <div class="foot-icon blue">⏱️</div>
+      <div><div class="foot-label">Turn</div><div class="foot-sub">Your turn</div></div>
+    </div>
+    <div class="foot-item">
+      <div class="foot-icon red">🎯</div>
+      <div><div class="foot-label">Goal</div><div class="foot-sub">Guess opponent's number</div></div>
+    </div>
+    <div class="foot-item">
+      <div class="foot-icon amber">🏆</div>
+      <div><div class="foot-label">Win Condition</div><div class="foot-sub">Guess the number correctly</div></div>
+    </div>
+    <div class="foot-item">
+      <div class="foot-icon gray">❓</div>
+      <div><div class="foot-label">Need Help?</div><div class="foot-sub"><a class="help-link" href="#" onclick="showHelp()">Check the rules</a></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======== STATE ========
+let peer = null;
+let conn = null;
+let myName = '';
+let oppName = '';
+let roomId = '';
+let isHost = false;
+let mySecret = null;
+let oppSecret = null;
+let myGuessCount = 0;
+let oppGuessCount = 0;
+let myTurn = false;
+let gameOver = false;
+let rangeMin = 1;
+let rangeMax = 100;
+let historyItems = [];
+let secretReady = false;
+let oppSecretReady = false;
+
+// ======== UTILS ========
+function showToast(msg, duration = 2000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function showScreen(id) {
+  ['lobby-screen','secret-screen','game-screen'].forEach(s => {
+    document.getElementById(s).classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+  if (id === 'lobby-screen') document.getElementById(id).style.display = 'flex';
+  else if (id === 'secret-screen') document.getElementById(id).style.display = 'flex';
+  else document.getElementById(id).style.display = 'block';
+}
+
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+}
+
+function nowTime() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function generateRoomId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+}
+
+// ======== LOBBY ========
+function goStep2() {
+  const name = document.getElementById('player-name-input').value.trim();
+  if (!name) { document.getElementById('name-err').textContent = 'Please enter your name.'; return; }
+  myName = name;
+  document.getElementById('lobby-step1').style.display = 'none';
+  document.getElementById('lobby-step2').style.display = 'block';
+  document.getElementById('player-name-input2').value = name;
+}
+
+function createRoom() {
+  const err = document.getElementById('join-err');
+  err.textContent = '';
+  roomId = generateRoomId();
+  isHost = true;
+  rangeMin = 1; rangeMax = 100;
+
+  peer = new Peer(roomId, { debug: 0 });
+  peer.on('open', () => {
+    document.getElementById('lobby-step2').style.display = 'none';
+    document.getElementById('lobby-waiting').classList.remove('hidden');
+    document.getElementById('display-room-id').textContent = roomId;
+  });
+  peer.on('connection', c => {
+    conn = c;
+    setupConn();
+  });
+  peer.on('error', e => { err.textContent = 'Error: ' + e.message; });
+}
+
+function joinRoom() {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  const err = document.getElementById('join-err');
+  err.textContent = '';
+  if (code.length < 4) { err.textContent = 'Enter a valid Room ID.'; return; }
+  roomId = code;
+  isHost = false;
+
+  peer = new Peer(undefined, { debug: 0 });
+  peer.on('open', () => {
+    conn = peer.connect(roomId);
+    setupConn();
+  });
+  peer.on('error', e => { err.textContent = 'Could not connect. Check the Room ID.'; });
+}
+
+function copyRoomId() {
+  navigator.clipboard.writeText(roomId).then(() => showToast('Room ID copied!'));
+}
+
+// ======== CONNECTION ========
+function setupConn() {
+  conn.on('open', () => {
+    send({ type: 'hello', name: myName, rangeMin, rangeMax });
+  });
+  conn.on('data', handleData);
+  conn.on('close', () => {
+    if (!gameOver) showToast('Opponent disconnected!', 3000);
+  });
+  conn.on('error', e => console.error(e));
+}
+
+function send(data) {
+  if (conn && conn.open) conn.send(data);
+}
+
+function handleData(data) {
+  if (data.type === 'hello') {
+    oppName = data.name;
+    if (isHost) {
+      rangeMin = data.rangeMin || 1;
+      rangeMax = data.rangeMax || 100;
+    }
+    send({ type: 'hello_ack', name: myName, rangeMin, rangeMax });
+    startSecretPhase();
+  } else if (data.type === 'hello_ack') {
+    oppName = data.name;
+    rangeMin = data.rangeMin || 1;
+    rangeMax = data.rangeMax || 100;
+    startSecretPhase();
+  } else if (data.type === 'secret_ready') {
+    oppSecretReady = true;
+    checkBothReady();
+  } else if (data.type === 'start_game') {
+    myTurn = data.firstTurn === (isHost ? 'host' : 'guest');
+    startGameScreen();
+  } else if (data.type === 'guess') {
+    handleOpponentGuess(data.guess);
+  } else if (data.type === 'hint') {
+    receiveHint(data.hint, data.guess);
+  } else if (data.type === 'chat') {
+    appendChat(oppName, data.msg, false);
+  } else if (data.type === 'play_again') {
+    handlePlayAgain();
+  }
+}
+
+// ======== SECRET PHASE ========
+function startSecretPhase() {
+  showScreen('secret-screen');
+  document.getElementById('secret-player-label').textContent = myName + ', pick your secret number!';
+  document.getElementById('secret-range-label').textContent = 'Choose between ' + rangeMin + ' and ' + rangeMax;
+  document.getElementById('secret-input').min = rangeMin;
+  document.getElementById('secret-input').max = rangeMax;
+}
+
+function lockSecret() {
+  const val = parseInt(document.getElementById('secret-input').value);
+  const err = document.getElementById('secret-err');
+  if (isNaN(val) || val < rangeMin || val > rangeMax) {
+    err.textContent = 'Enter a number between ' + rangeMin + ' and ' + rangeMax + '.';
+    return;
+  }
+  err.textContent = '';
+  mySecret = val;
+  secretReady = true;
+  document.getElementById('secret-input').disabled = true;
+  document.querySelector('#secret-screen .btn-primary').disabled = true;
+  document.getElementById('secret-waiting-msg').classList.remove('hidden');
+  send({ type: 'secret_ready' });
+  checkBothReady();
+}
+
+function checkBothReady() {
+  if (secretReady && oppSecretReady) {
+    if (isHost) {
+      const firstTurn = Math.random() < 0.5 ? 'host' : 'guest';
+      send({ type: 'start_game', firstTurn });
+      myTurn = firstTurn === 'host';
+      startGameScreen();
+    }
+  }
+}
+
+// ======== GAME SCREEN ========
+function startGameScreen() {
+  myGuessCount = 0;
+  oppGuessCount = 0;
+  historyItems = [];
+  gameOver = false;
+
+  // Set UI
+  document.getElementById('game-room-id').textContent = roomId;
+  document.getElementById('game-range-badge').textContent = 'Range: ' + rangeMin + ' – ' + rangeMax;
+
+  const myInits = initials(myName);
+  const oppInits = initials(oppName);
+
+  document.getElementById('game-my-avatar').textContent = myInits;
+  document.getElementById('game-my-name').textContent = myName + ' (You)';
+  document.getElementById('opp-name-label').textContent = oppName;
+  document.getElementById('my-guesses-label').textContent = myName + ' guesses';
+  document.getElementById('opp-guesses-label').textContent = oppName + ' guesses';
+  document.getElementById('sidebar-my-avatar').textContent = myInits;
+  document.getElementById('sidebar-my-name').textContent = myName;
+  document.getElementById('sidebar-opp-avatar').textContent = oppInits;
+  document.getElementById('sidebar-opp-name').textContent = oppName;
+  document.getElementById('wait-for-name').textContent = oppName;
+
+  document.getElementById('guess-input').min = rangeMin;
+  document.getElementById('guess-input').max = rangeMax;
+  document.getElementById('history-list').innerHTML = '<li style="font-size:13px;color:var(--gray-400);text-align:center;padding:12px 0;">No guesses yet</li>';
+  document.getElementById('chat-messages').innerHTML = '<div style="font-size:12px;color:var(--gray-400);text-align:center;">Say hi to your opponent!</div>';
+  document.getElementById('win-banner').classList.add('hidden');
+  document.getElementById('lose-banner').classList.add('hidden');
+  document.getElementById('rematch-row').classList.add('hidden');
+
+  updateTurnUI();
+  showScreen('game-screen');
+}
+
+function updateTurnUI() {
+  const myPill = document.getElementById('my-status-pill');
+  const oppPill = document.getElementById('opp-status-pill');
+  const yourTurnBadge = document.getElementById('your-turn-badge');
+  const waitingBox = document.getElementById('waiting-msg-box');
+  const guessInput = document.getElementById('guess-input');
+  const guessBtn = document.getElementById('guess-btn');
+
+  if (myTurn) {
+    yourTurnBadge.style.display = 'flex';
+    waitingBox.classList.add('hidden');
+    guessInput.disabled = false;
+    guessBtn.disabled = false;
+    myPill.textContent = 'Guessing';
+    myPill.className = 'status-pill pill-guessing';
+    oppPill.textContent = 'Waiting';
+    oppPill.className = 'status-pill pill-waiting';
+  } else {
+    yourTurnBadge.style.display = 'none';
+    waitingBox.classList.remove('hidden');
+    guessInput.disabled = true;
+    guessBtn.disabled = true;
+    myPill.textContent = 'Waiting';
+    myPill.className = 'status-pill pill-waiting';
+    oppPill.textContent = 'Guessing';
+    oppPill.className = 'status-pill pill-guessing';
+  }
+}
+
+// ======== GUESSING ========
+function submitGuess() {
+  if (!myTurn || gameOver) return;
+  const val = parseInt(document.getElementById('guess-input').value);
+  const errEl = document.getElementById('guess-err');
+  if (isNaN(val) || val < rangeMin || val > rangeMax) {
+    errEl.textContent = 'Enter a number between ' + rangeMin + ' and ' + rangeMax + '.';
+    return;
+  }
+  errEl.textContent = '';
+  myGuessCount++;
+  document.getElementById('my-guesses-count').textContent = myGuessCount;
+  document.getElementById('guess-input').value = '';
+
+  // Send guess to opponent — they will respond with a hint
+  send({ type: 'guess', guess: val });
+  myTurn = false;
+  updateTurnUI();
+
+  // Add placeholder to history
+  addHistory(myName, val, '…', 'me');
+}
+
+function handleOpponentGuess(guess) {
+  oppGuessCount++;
+  document.getElementById('opp-guesses-count').textContent = oppGuessCount;
+
+  let hint;
+  if (guess === mySecret) {
+    hint = 'correct';
+    send({ type: 'hint', hint: 'correct', guess });
+    addHistory(oppName, guess, 'Correct!', 'opp');
+    endGame(false, oppName + ' guessed your number (' + mySecret + ') correctly!');
+  } else if (guess < mySecret) {
+    hint = 'higher';
+    send({ type: 'hint', hint: 'higher', guess });
+    addHistory(oppName, guess, 'Higher', 'opp');
+    myTurn = true;
+    updateTurnUI();
+  } else {
+    hint = 'lower';
+    send({ type: 'hint', hint: 'lower', guess });
+    addHistory(oppName, guess, 'Lower', 'opp');
+    myTurn = true;
+    updateTurnUI();
+  }
+}
+
+function receiveHint(hint, guess) {
+  // Update the last placeholder in history
+  const list = document.getElementById('history-list');
+  const items = list.querySelectorAll('li.history-item');
+  if (items.length > 0) {
+    const last = items[items.length - 1];
+    const badge = last.querySelector('.hint-badge');
+    if (badge) {
+      if (hint === 'correct') {
+        badge.className = 'hint-badge hint-correct';
+        badge.innerHTML = '✅ Correct!';
+        endGame(true, 'You guessed the number in ' + myGuessCount + ' attempt' + (myGuessCount===1?'':'s') + '!');
+      } else if (hint === 'higher') {
+        badge.className = 'hint-badge hint-higher';
+        badge.innerHTML = '⬆️ Higher';
+        myTurn = false; // opponent now guesses
+      } else {
+        badge.className = 'hint-badge hint-lower';
+        badge.innerHTML = '⬇️ Lower';
+        myTurn = false;
+      }
+    }
+  }
+  if (hint !== 'correct') {
+    updateTurnUI();
+  }
+}
+
+function addHistory(player, guess, hintLabel, who) {
+  const list = document.getElementById('history-list');
+  const placeholder = list.querySelector('li:not(.history-item)');
+  if (placeholder) placeholder.remove();
+
+  let hintClass = 'hint-neutral';
+  let hintDisplay = hintLabel;
+  if (hintLabel === 'Higher') { hintClass = 'hint-higher'; hintDisplay = '⬆️ Higher'; }
+  else if (hintLabel === 'Lower') { hintClass = 'hint-lower'; hintDisplay = '⬇️ Lower'; }
+  else if (hintLabel === 'Correct!') { hintClass = 'hint-correct'; hintDisplay = '✅ Correct!'; }
+  else if (hintLabel === '…') { hintClass = ''; hintDisplay = '…'; }
+
+  const li = document.createElement('li');
+  li.className = 'history-item';
+  li.innerHTML = `
+    <span>
+      <span class="hint-who">${player}</span> &nbsp; Guess: <strong>${guess}</strong>
+    </span>
+    <span class="hint-badge ${hintClass}">${hintDisplay}</span>
+  `;
+  list.appendChild(li);
+  list.scrollTop = list.scrollHeight;
+}
+
+// ======== GAME END ========
+function endGame(won, subtitle) {
+  gameOver = true;
+  document.getElementById('guess-input').disabled = true;
+  document.getElementById('guess-btn').disabled = true;
+
+  if (won) {
+    document.getElementById('win-banner').classList.remove('hidden');
+    document.getElementById('win-title').textContent = 'You won! 🎉';
+    document.getElementById('win-sub').textContent = subtitle;
+  } else {
+    document.getElementById('lose-banner').classList.remove('hidden');
+    document.getElementById('lose-title').textContent = 'You lost!';
+    document.getElementById('lose-sub').textContent = subtitle;
+  }
+  document.getElementById('rematch-row').classList.remove('hidden');
+  document.getElementById('your-turn-badge').style.display = 'none';
+  document.getElementById('waiting-msg-box').classList.add('hidden');
+}
+
+// ======== CHAT ========
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  send({ type: 'chat', msg });
+  appendChat(myName, msg, true);
+}
+
+function appendChat(name, msg, isMe) {
+  const box = document.getElementById('chat-messages');
+  const placeholder = box.querySelector('div');
+  if (placeholder && placeholder.style.textAlign === 'center') placeholder.remove();
+
+  const avCls = isMe ? (isHost ? 'p1' : 'p2') : (isHost ? 'p2' : 'p1');
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isMe ? ' mine' : '');
+  div.innerHTML = `
+    <div class="chat-avatar ${avCls}">${initials(name)}</div>
+    <div>
+      ${!isMe ? `<div class="chat-name">${name}</div>` : ''}
+      <div class="chat-bubble ${isMe ? 'mine-bubble' : 'theirs'}">${escHtml(msg)}</div>
+      <div class="chat-time">${nowTime()}</div>
+    </div>
+  `;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ======== PLAY AGAIN ========
+function playAgain() {
+  send({ type: 'play_again' });
+  resetForNewGame();
+}
+
+function handlePlayAgain() {
+  resetForNewGame();
+}
+
+function resetForNewGame() {
+  mySecret = null;
+  oppSecret = null;
+  secretReady = false;
+  oppSecretReady = false;
+  myGuessCount = 0;
+  oppGuessCount = 0;
+  historyItems = [];
+  gameOver = false;
+  myTurn = false;
+  startSecretPhase();
+}
+
+function leaveGame() {
+  if (conn) conn.close();
+  if (peer) peer.destroy();
+  conn = null; peer = null;
+  location.reload();
+}
+
+function showHelp() {
+  showToast('Each player picks a secret number. Take turns guessing. After each guess, you\'ll be told Higher, Lower, or Correct!', 4000);
+}
+
+// ======== ENTER KEY ========
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (!document.getElementById('lobby-screen').classList.contains('hidden')) {
+      if (document.getElementById('lobby-step2').style.display === 'block') {
+        const code = document.getElementById('join-code-input').value.trim();
+        if (code.length > 0) joinRoom(); else createRoom();
+      } else {
+        goStep2();
+      }
+    } else if (!document.getElementById('guess-input').disabled && document.activeElement === document.getElementById('guess-input')) {
+      submitGuess();
+    }
+  }
+});
+
+// Auto-uppercase join code
+document.getElementById('join-code-input').addEventListener('input', function() {
+  this.value = this.value.toUpperCase();
+});
+
+// Initial screen
+showScreen('lobby-screen');
+document.getElementById('lobby-screen').style.display = 'flex';
+document.getElementById('secret-screen').style.display = 'none';
+document.getElementById('game-screen').style.display = 'none';
+</script>
+</body>
+</html>
